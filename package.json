@@ -1,0 +1,19 @@
+{
+  "name": "book-swap-api",
+  "version": "1.0.0",
+  "description": "Trading book app for Thinkful's Full Stack Project",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/imhighyat/book-swap-api.git"
+  },
+  "author": "Hayat Mazzarella",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/imhighyat/book-swap-api/issues"
+  },
+  "homepage": "https://github.com/imhighyat/book-swap-api#readme"
+}
