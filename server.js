@@ -6,13 +6,26 @@ const bodyParser = require('body-parser');
 const morgan = require('morgan');
 
 const {CLIENT_ORIGIN, PORT, DATABASE_URL} = require('./config');
+const usersRouter = require('./routers/usersRouter');
+const searchRouter = require('./routers/searchRouter');
+const booksRouter = require('./routers/booksRouter');
+const swapRequestsRouter = require('./routers/swapRequestsRouter');
 
 app.use(morgan('common'));
 app.use(bodyParser.json());
 app.use(cors({origin: CLIENT_ORIGIN}));
 
-app.get('/api/*', (req, res) => {
-	res.json({ok: true});
+//route all /restaurants to usersRouter.js
+app.use('/api/users', usersRouter);
+//route all /restaurants to searchRouter.js
+app.use('/api/search', searchRouter);
+//route all /restaurants to booksRouter.js
+app.use('/api/books', booksRouter);
+//route all /restaurants to swapRequestsRouter.js
+app.use('/api/swapRequestsRouter', swapRequestsRouter);
+//any other endpoint, send a msg
+app.use('*', (req,res)=>{
+	res.send('Address not found. Please check your URL.');
 });
 
 let server;
