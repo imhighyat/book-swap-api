@@ -27,6 +27,9 @@ const userSchema = mongoose.Schema({
 		state: {type: String, required: true},
 		zip: {type: String, required: true}
 	},
+	library: [{
+		book: { type: mongoose.Schema.Types.ObjectId, ref: 'Book' }
+	}],
 	memberSince: {
 		type: Date,
 		required: true,
@@ -46,7 +49,7 @@ userSchema.virtual('fullAddress').get(function(){
 	return `${this.address.street}, ${this.address.city}, ${this.address.state} ${this.address.zip}`;
 });
 
-userSchema.methods.serialize = function() {
+/*userSchema.methods.serialize = function() {
   return {
     id: this._id,
     name: this.fullName,
@@ -54,9 +57,10 @@ userSchema.methods.serialize = function() {
     username: this.username,
     password: this.password,
     email: this.email,
-    phoneNumber: this.phoneNumber
+    phoneNumber: this.phoneNumber,
+    library: this.library
   };
-}
+}*/
 
 const User = mongoose.model('User', userSchema);
 
