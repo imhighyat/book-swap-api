@@ -10,13 +10,13 @@ const {Book} = require('../models/booksModel');
 const internalMsg = 'Internal server error occured.';
 const emptySearchMsg = 'Empty search requested.';
 const unexpectedQueryMsg = 'Unexpected query key.';
+const cantFindMsg = 'Cant find books';
 
 router.get('/', (req, res) => {
 	let queryKey = Object.keys(req.query);
 	let searchValue;
 	let bookPromise;
 	let category;
-	const cantFindMsg = 'Cant find books';
 	if(queryKey.length === 0){
 		return res.status(400).json({ message: emptySearchMsg });
 	}

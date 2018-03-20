@@ -120,4 +120,17 @@ router.delete('/:id', (req, res) => {
 	});
 });
 
+router.get('/:id/books', (req, res) => {
+	User.findById(req.params.id).populate('book')
+		.then(user => {
+			console.log(user);
+			res.status(200).json(user.library);
+		})
+		.catch(err => {
+			console.log(err);
+			res.status(500).send(err);
+		});
+});
+
+
 module.exports = router;
