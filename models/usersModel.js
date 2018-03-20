@@ -28,7 +28,8 @@ const userSchema = mongoose.Schema({
 		zip: {type: String, required: true}
 	},
 	library: [{
-		book: { type: mongoose.Schema.Types.ObjectId, ref: 'Book' }
+		book: { type: mongoose.Schema.Types.ObjectId, ref: 'Book' },
+		hasPendingRequest: { type: Boolean, default: false }
 	}],
 	memberSince: {
 		type: Date,

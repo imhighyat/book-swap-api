@@ -12,24 +12,24 @@ const requestSchema = mongoose.Schema({
 		required: true
 	},
 	requestFrom: {
-		type: mongoose.Schema.Types.ObjectId, //string with ID of rest
+		type: mongoose.Schema.Types.ObjectId,
 		ref: 'User',
 		required: true
 	},
 	requestTo: {
-		type: mongoose.Schema.Types.ObjectId, //string with ID of rest
+		type: mongoose.Schema.Types.ObjectId,
 		ref: 'User',
 		required: true
 	},
 	requestedBook: {
-		type: mongoose.Schema.Types.ObjectId, //string with ID of rest
+		type: mongoose.Schema.Types.ObjectId,
 		ref: 'Book',
 		required: true
-	},
+	}/*,
 	tradedBook: {
-		type: mongoose.Schema.Types.ObjectId, //string with ID of rest
+		type: mongoose.Schema.Types.ObjectId,
 		ref: 'Book',
-	},
+	},*/
 });
 
 const Request = mongoose.model('Request', requestSchema);

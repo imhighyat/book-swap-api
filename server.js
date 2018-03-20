@@ -9,7 +9,7 @@ const {CLIENT_ORIGIN, PORT, DATABASE_URL} = require('./config');
 const usersRouter = require('./routers/usersRouter');
 const searchRouter = require('./routers/searchRouter');
 const booksRouter = require('./routers/booksRouter');
-const swapRequestsRouter = require('./routers/swapRequestsRouter');
+const requestsRouter = require('./routers/requestsRouter');
 
 app.use(morgan('common'));
 app.use(bodyParser.json());
@@ -21,8 +21,8 @@ app.use('/api/users', usersRouter);
 app.use('/api/search', searchRouter);
 //route all /restaurants to booksRouter.js
 app.use('/api/books', booksRouter);
-//route all /restaurants to swapRequestsRouter.js
-app.use('/api/swapRequestsRouter', swapRequestsRouter);
+//route all /restaurants to requestsRouter.js
+app.use('/api/requests', requestsRouter);
 //any other endpoint, send a msg
 app.use('*', (req,res)=>{
 	res.send('Address not found. Please check your URL.');

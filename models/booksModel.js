@@ -6,7 +6,7 @@ const bookSchema = mongoose.Schema({
 		required: true
 	},
 	images: {
-		type: Array,
+		type: Object,
 		required: true
 	},
 	summary: {
