@@ -5,58 +5,61 @@ const mongoose = require('mongoose');
 mongoose.Promise = global.Promise;
 
 const {User} = require('../models/usersModel');
+const {Book} = require('../models/booksModel');
 const internalMessage = 'Internal server error occured.';
+const queryUnexpected = 'Query value unexpected.';
 
 //fetch users whether with queries or none
 router.get('/', (req, res) => {
-	console.log('Fetching users.');
 	let userPromise;
 	const active = req.query.active;
+	//if no query was sent, fetch all user accounts
 	if(typeof(active) === "undefined"){
 		userPromise = User.find();
 	}
+	//if query value is a string and value is either true/false,
+	//assign the db query parameter to the value of req.query
 	else if(typeof(active) === "string" && (active === "true" || active === "false")){
 		userPromise = User.find({isActive: active});
 	}
+	//send a warning msg if query is unexpected
 	else{
-		const message = 'Query value unexpected.';
-		return res.status(400).send(message);
+		return res.status(400).json({ message: queryUnexpected });
 	}
-
+	//query db based on the value of userPromise
 	userPromise
-	.then(data => {
-		//res.status(200).json({users: data.map(user => user.serialize())});
-		res.status(200).json(data);
-	})
-	.catch(err => {
-		console.log(err);
-		res.status(500).send(internalMessage);
-	});
+		.then(data => {
+			res.status(200).json(data);
+		})
+		.catch(err => {
+			console.log(err);
+			res.status(500).json({ message: internalMessage });
+		});
 });
 
+//fetch user account with an id
 router.get('/:id', (req, res) => {
-	User.findById(req.params.id)
-	.then(data => {
-		//res.status(200).json(data.serialize());
-		res.status(200).json(data);
-	})
-	.catch(err => {
-		console.log(err);
-		res.status(500).send(internalMessage);
-	});
+	User.findById(req.params.id).populate('book')
+		.then(data => {
+			res.status(200).json(data);
+		})
+		.catch(err => {
+			console.log(err);
+			res.status(500).json({ message: internalMessage });
+		});
 });
 
+//create a user account
 router.post('/', (req, res) => {
+	//add all the required fields to an array
 	const requiredFields = ['name', 'username', 'password', 'email', 'phoneNumber', 'address', 'library'];
-	//use for loop to check if all required properties are in the req body
+	//loop through the array and check if all required properties are in the req body
 	for(let i=0; i<requiredFields.length; i++){
 		const field = requiredFields[i];
 		if(!(field in req.body)){
+			//if any of the field is missing
 			const message = `Missing ${field} in request body.`;
-			//console error the message if at least one is missing
-			console.error(message);
-			//return with a 400 staus and the error message
-			return res.status(400).send(message);
+			return res.status(400).json({message});
 		}
 	}
 	//if all properties are in the request body
@@ -76,19 +79,19 @@ router.post('/', (req, res) => {
 	});
 });
 
+//update a user account
 router.put('/:id', (req, res) => {
 	// ensure that the id in the request path and the one in request body match
 	if(!(req.params.id === req.body.id)){
 		const message = `The request path ID ${req.params.id} and request body ID ${req.body.id} should match.`;
-		console.error(message);
-		return res.status(400).send(message);
+		return res.status(400).json({message});
 	}
 	//we need something to hold what the updated data should be
 	const toUpdate = {};
 	//properties that client can update
 	const canBeUpdated = ['email', 'password', 'phoneNumber', 'address'];
 	//loop through the properties that can be updated
-	//check if client sent in updated data for those
+	//check if client sent in data for those
 	for(let i=0; i<canBeUpdated.length;i++){
 		const field = canBeUpdated[i];
 		//if the property is in the req body and it is not null
@@ -97,10 +100,10 @@ router.put('/:id', (req, res) => {
 			toUpdate[field] = req.body[field];
 		}
 	}
-	//update the database by finding the id first using the id from req
-	//then set the data to update
+	//update the database
 	User.findByIdAndUpdate(req.params.id, {$set: toUpdate})
 	.then(()=>{
+		//make sure to return the update account
 		return User.findById(req.params.id)
 			.then(data => res.status(200).json(data));
 	})
@@ -113,22 +116,119 @@ router.put('/:id', (req, res) => {
 //disable a specific restaturant profile/account by setting isActive to false
 router.delete('/:id', (req, res) => {
 	User.findByIdAndUpdate(req.params.id, {$set: {isActive: "false"}})
-	.then(()=> res.status(200).send('Account disabled.'))
+	.then(()=> {
+		const message = 'Account has been disabled.';
+		res.status(200).json({message});
+	})
 	.catch(err => {
 		console.log(err);
 		res.status(400).send(internalMsg)
 	});
 });
 
+//get a users library
 router.get('/:id/books', (req, res) => {
 	User.findById(req.params.id).populate('book')
 		.then(user => {
-			console.log(user);
 			res.status(200).json(user.library);
 		})
 		.catch(err => {
 			console.log(err);
 			res.status(500).send(err);
+		});
+});
+
+//add a book to user's library
+router.post('/:id/books', (req, res) => {
+	//params id needs to be matching the user id that we are posting to
+	//if not matching return a warning message
+	if(!(req.params.id === req.body.id)){
+		const message = `The request path ID ${req.params.id} and request body ID ${req.body.id} should match.`;
+		return res.status(400).json({message});
+	}	
+	//make sure that the book field is passed on to the req.body
+	//if not return a warning message
+	if(!('book' in req.body)){
+		const message = 'Missing the book id in request body.';
+		return res.status(400).json({message});
+	}
+	//check on the books collection first using the isbn from req body
+	Book.find({ isbn: req.body.book })
+		.then(result => {
+			//if we have a result
+			if(result.length){
+				//assign the Obj id to an obj
+				const bookObj = {book: result[0].id};
+				//check if user already registered the book in the library
+				User.findById(req.params.id)
+					.then(user => {
+						//assign the whole library to a variable
+						const userLibrary = user.library;
+						//loop through the elements and compare if we already have that book obj id
+						for(let i=0; i<userLibrary.length; i++){
+							//if it exists, return a warning msg
+							if(userLibrary[i].book.toString() === bookObj.book){
+								const message = 'Book already exists in the library.';
+								return res.status(200).json({message})
+							}
+						}
+						//otherwise add the book obj to the user's library using push
+						User.findByIdAndUpdate(req.params.id, {$push: {library: bookObj}})
+							.then(()=> {
+								//then make sure that the updated info is returned
+								User.findById(req.params.id)
+									.then((user) => {
+										res.status(200).json(user);
+									})
+									.catch(err => {
+									console.log(err);
+									res.status(500).json({ message: internalMsg });
+								});
+							})
+							.catch(err => {
+								console.log(err);
+								res.status(500).json({ message: internalMsg });
+							});
+					})
+					.catch(err => {
+						console.log(err);
+						res.status(500).json({ message: internalMsg });
+					});
+			}
+		})
+		.catch(err => {
+			console.log(err);
+			res.status(500).json({ message: internalMsg });
+		});
+});
+
+//removes the book from user library
+//uses the object id of the current book entry that is being deleted
+router.delete('/:id/books/:bookEntryId', (req, res) => {
+	User.findById(req.params.id).populate('book')
+		.then(user => {
+			//assigns the library to a variable
+			const userLibrary = user.library;
+			let index;
+			//loop through the array and get  the index of the element
+			//that has the value of id equal to the bookEntryId
+			for(let i=0; i<userLibrary.length; i++){
+				if(userLibrary[i].id === req.params.bookEntryId){
+					index = i;
+				}
+			}
+			//remove the book in that index and create a new updated library
+			const removedBook = userLibrary.splice(index, 1);
+			User.findByIdAndUpdate(req.params.id, { $set: { library: userLibrary } })
+				.then(() => res.status(200).json({ message: 'Book has been deleted.' }))
+				.catch(err => {
+					console.log(err);
+					res.status(500).json({ message: internalMsg });
+				});
+		})
+		.catch(err => {
+			console.log(err);
+			res.status(500).json({ message: internalMsg });
 		});
 });
 
