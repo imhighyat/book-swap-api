@@ -11,9 +11,12 @@ const internalMsg = 'Internal server error occured.';
 const emptySearchMsg = 'Empty search requested.';
 const unexpectedQueryMsg = 'Unexpected query key.';
 const cantFindMsg = 'Cant find books';
+const {GOOGLE_API} = require('../config');
 
+//performs a search based on the queries
+//can only search one category at a time
 router.get('/', (req, res) => {
-	//store the query in an array
+	//obtain the query key and store it
 	let queryKey = Object.keys(req.query);
 	let searchValue, bookPromise, category;
 	//if there is no query passed, send a warning msg
@@ -29,12 +32,12 @@ router.get('/', (req, res) => {
 		else if(queryKey[0] === "author"){
 			searchValue = req.query.author;
 			category = "inauthor";
-			bookPromise = Book.find({ authors: { $regex: searchValue, $options: "i"} });
+			bookPromise = Book.find({ authors: { $in: searchValue.split(" ") }});
 		}
 		else if(queryKey[0] === "title"){
 			searchValue = req.query.title;
 			category = "intitle";
-			bookPromise = Book.find({ title: { $regex: searchValue, $options: "i"} });
+			bookPromise = Book.find({ title: { $in: searchValue.split(" ") }});
 		}
 		else{
 			return res.status(400).json({ message: unexpectedQueryMsg });
@@ -52,9 +55,9 @@ router.get('/', (req, res) => {
 				return res.status(200).json(results);
 			}
 			//else, make an API call to google book using category and searchValue from client
-			axios.get(`https://www.googleapis.com/books/v1/volumes?q=${category}:${searchValue}&key=AIzaSyC2NVsP7NrHPF6_lhNn_m7wK7WOi0wXYpk&maxResults=40`)
+			axios.get(`https://www.googleapis.com/books/v1/volumes?q=${category}:${searchValue.split(" ").join("+")}&key=${GOOGLE_API}&maxResults=40`)
 				.then(googleResults => {
-					//if no results found by API, send a msg that we cant find the book
+					//if no results found by google API, send a msg that we cant find the book
 					if(!googleResults.data.totalItems){
 						res.status(404).json({message: cantFindMsg});
 					}
@@ -68,6 +71,8 @@ router.get('/', (req, res) => {
 						for(let i = 0; i < searchResults.length; i++){
 							let isbn, images, summary;
 							//check for the fields we need to update the collection
+							//industryIdentifiers, imageLinks and summary is not always present in the results
+							//we make sure to assign default values to these
 							searchResults[i].hasOwnProperty('industryIdentifiers') ?
 								isbn = searchResults[i].industryIdentifiers.map(obj => obj.identifier) : 
 									isbn = [];
@@ -77,7 +82,7 @@ router.get('/', (req, res) => {
 							searchResults[i].hasOwnProperty('description') ?
 								summary = searchResults[i].description : 
 									summary = 'No summary provided for this book.';
-							//create an obj to pass when creating new book
+							//create an obj to pass when creating new book on each loop
 							let bookInfoToStore = {
 									isbn: isbn,
 									images: images,
@@ -110,6 +115,8 @@ router.get('/', (req, res) => {
 	}
 });
 
+//will make a search call straight to google
+//needed when books collection results are not satisfying the client's search
 router.get('/deepsearch', (req, res) => {
 	//store the query in an array
 	let queryKey = Object.keys(req.query);
@@ -139,7 +146,7 @@ router.get('/deepsearch', (req, res) => {
 			return res.status(400).json({ message: emptySearchMsg });
 		}
 		//make an API call to google book using category and searchValue from client
-		axios.get(`https://www.googleapis.com/books/v1/volumes?q=${category}:${searchValue}&key=AIzaSyC2NVsP7NrHPF6_lhNn_m7wK7WOi0wXYpk&maxResults=40`)
+		axios.get(`https://www.googleapis.com/books/v1/volumes?q=${category}:${searchValue.split(" ").join("+")}&key=${GOOGLE_API}&maxResults=40`)
 			.then(googleResults => {
 				//if no results found by API, send a msg that we cant find the book
 				if(!googleResults.data.totalItems){
