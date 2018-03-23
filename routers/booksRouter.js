@@ -13,7 +13,7 @@ const {GOOGLE_API} = require('../config');
 //fetch all books in the collection
 router.get('/', (req, res) => {
 	Book.find({})
-		.then(data => {res.status(200).json(data); console.log(data.length)})
+		.then(data => res.status(200).json(data))
 		.catch(err => {
 			console.log(err);
 			res.status(400).send(err);
@@ -27,7 +27,6 @@ router.get('/:isbn', (req, res) => {
 		.then(data => {
 			//if collection cant find a match
 			if(!data.length){
-				console.log('checking google');
 				//make api call to google
 				return axios.get(`https://www.googleapis.com/books/v1/volumes?q=isbn:${req.params.isbn}&key=${GOOGLE_API}&maxResults=40`)
 					.then(googleResult => {
@@ -69,7 +68,6 @@ router.get('/:isbn', (req, res) => {
 						res.status(400).json(internalMsg);
 					});
 			}
-			console.log('found in the collection');
 			res.status(200).json(data); 
 		})
 		.catch(err => {

@@ -1,27 +1,30 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
+const axios = require('axios');
 //use ES6 promises
 mongoose.Promise = global.Promise;
 
 const {User} = require('../models/usersModel');
 const {Book} = require('../models/booksModel');
 const {Request} = require('../models/requestsModel');
+const {GOOGLE_API} = require('../config');
 const internalMessage = 'Internal server error occured.';
 const queryUnexpected = 'Query value unexpected.';
 const emptySearchMsg = 'Empty search requested.';
+const cantFindMsg = 'Cant find books';
 
 //fetch users whether with queries or none
 router.get('/', (req, res) => {
 	let userPromise;
 	const active = req.query.active;
 	//if no query was sent, fetch all user accounts
-	if(typeof(active) === "undefined"){
+	if(typeof(active) === 'undefined'){
 		userPromise = User.find();
 	}
 	//if query value is a string and value is either true/false,
 	//assign the db query parameter to the value of req.query
-	else if(typeof(active) === "string" && (active === "true" || active === "false")){
+	else if(typeof(active) === 'string' && (active === 'true' || active === 'false')){
 		userPromise = User.find({isActive: active});
 	}
 	//send a warning msg if query is unexpected
@@ -41,7 +44,7 @@ router.get('/', (req, res) => {
 
 //fetch user account with an id
 router.get('/:id', (req, res) => {
-	User.findById(req.params.id).populate('book')
+	User.findById(req.params.id)
 		.then(data => {
 			res.status(200).json(data);
 		})
@@ -61,7 +64,7 @@ router.post('/', (req, res) => {
 		if(!(field in req.body)){
 			//if any of the field is missing
 			const message = `Missing ${field} in request body.`;
-			return res.status(400).json({message});
+			return res.status(400).json({ message });
 		}
 	}
 	//if all properties are in the request body
@@ -117,7 +120,7 @@ router.put('/:id', (req, res) => {
 
 //disable a specific restaturant profile/account by setting isActive to false
 router.delete('/:id', (req, res) => {
-	User.findByIdAndUpdate(req.params.id, {$set: {isActive: "false"}})
+	User.findByIdAndUpdate(req.params.id, {$set: {isActive: 'false'}})
 	.then(()=> {
 		const message = 'Account has been disabled.';
 		res.status(200).json({message});
@@ -128,11 +131,30 @@ router.delete('/:id', (req, res) => {
 	});
 });
 
-//get a users library
+//fetch books from user's library depending on the query
 router.get('/:id/books', (req, res) => {
-	User.findById(req.params.id).populate('book')
+	const available = req.query.available;	
+	User.findById(req.params.id)
 		.then(user => {
-			res.status(200).json(user.library);
+			const library = user.library;
+			//if no query was sent, return all user accounts
+			if(typeof(available) === 'undefined'){
+				res.status(200).json(library);
+			}
+			//if the value is either true or false
+			else if(typeof(available) === 'string' && (available === 'true' || available === 'false')){
+				//if available is true, return the books that has no pending request
+				//else return the ones with pending request
+				const filteredResult = library.filter(element => {
+					if(element.hasPendingRequest.toString() !== available){
+						return element;
+					}
+				});
+				res.status(200).json(filteredResult);
+			}
+			else{
+				res.status(200).json(queryUnexpected);
+			}
 		})
 		.catch(err => {
 			console.log(err);
@@ -180,7 +202,8 @@ router.post('/:id/books', (req, res) => {
 								//then make sure that the updated info is returned
 								User.findById(req.params.id)
 									.then((user) => {
-										res.status(200).json(user);
+										//here we'll returning just the book that was created
+										res.status(200).json(user.library[user.library.length-1]);
 									})
 									.catch(err => {
 									console.log(err);
@@ -197,17 +220,59 @@ router.post('/:id/books', (req, res) => {
 						res.status(500).json({ message: internalMsg });
 					});
 			}
+			//else check google for the isbn
+			else{
+				axios.get(`https://www.googleapis.com/books/v1/volumes?q=isbn:${req.body.book}&key=${GOOGLE_API}&maxResults=40`)
+					.then(googleResult => {
+						//if found no results, send a msg that we cant find it
+						if(!googleResult.data.totalItems){
+							return res.status(404).json({message: cantFindMsg});
+						}
+						//save the result to our collection first before returning it
+						else{
+							let searchResult = googleResult.data.items[0].volumeInfo;
+							let isbn, images, summary;
+							searchResult.hasOwnProperty('industryIdentifiers') ?
+								isbn = searchResult.industryIdentifiers.map(obj => obj.identifier) : 
+									isbn = [];
+							searchResult.hasOwnProperty('imageLinks') ?
+								images = searchResult.imageLinks : 
+									images = { };
+							searchResult.hasOwnProperty('description') ?
+								summary = searchResult.description : 
+									summary = 'No summary provided for this book.';
+							let bookInfoToStore = {
+									isbn: isbn,
+									images: images,
+									summary: summary,
+									authors: searchResult.authors,
+									title: searchResult.title
+							};
+							Book.create(bookInfoToStore)
+								.then(() => Promise.resolve())
+								.catch(err => {
+									console.log(err);
+									res.status(500).json({ message: internalMsg });
+								});
+							res.status(200).json(searchResult);
+						}
+					})
+					.catch(err => {
+						console.log(err);
+						res.status(500).json({ message: internalMessage });
+					});
+			}
 		})
 		.catch(err => {
 			console.log(err);
-			res.status(500).json({ message: internalMsg });
+			res.status(500).json({ message: internalMessage });
 		});
 });
 
 //removes the book from user library
 //uses the object id of the current book entry that is being deleted
 router.delete('/:id/books/:bookEntryId', (req, res) => {
-	User.findById(req.params.id).populate('book')
+	User.findById(req.params.id)
 		.then(user => {
 			//assigns the library to a variable
 			const userLibrary = user.library;
@@ -215,7 +280,7 @@ router.delete('/:id/books/:bookEntryId', (req, res) => {
 			//loop through the array and get  the index of the element
 			//that has the value of id equal to the bookEntryId
 			for(let i=0; i<userLibrary.length; i++){
-				if(userLibrary[i].id === req.params.bookEntryId){
+				if(userLibrary[i].id.toString() === req.params.bookEntryId){
 					index = i;
 				}
 			}
@@ -256,7 +321,7 @@ router.get('/:userId/requests', (req, res) => {
 					if(userQueries[0] === 'status'){
 						//filter the requestResults array
 						//only return elements with the same status as the query
-						const filteredStatusArray = requestResults.map(element => {
+						const filteredStatusArray = requestResults.filter(element => {
 							if(element.status === req.query.status){
 								return element;
 							}
@@ -274,7 +339,7 @@ router.get('/:userId/requests', (req, res) => {
 							console.log('origin is me');
 							//filter the requestResults array
 							//only return elements with the userId in the requestFrom key
-							const filteredStatusArray = requestResults.map(element => {
+							const filteredStatusArray = requestResults.filter(element => {
 								if(element.requestFrom.toString() === userId){
 									return element;
 								}
@@ -287,7 +352,7 @@ router.get('/:userId/requests', (req, res) => {
 							console.log('origin is not me');
 							//filter the requestResults array
 							//only return elements with the userId in the requestTo key
-							const filteredStatusArray = requestResults.map(element => {
+							const filteredStatusArray = requestResults.filter(element => {
 								if(element.requestTo.toString() === userId){
 									return element;
 								}
@@ -305,7 +370,7 @@ router.get('/:userId/requests', (req, res) => {
 					//if origin is me
 					if(origin === "me"){
 						//filter and return elements matching the query
-						const filteredStatusArray = requestResults.map(element => {
+						const filteredStatusArray = requestResults.filter(element => {
 							if(element.requestFrom.toString() === userId && element.status === status){
 								return element;
 							}
@@ -315,7 +380,7 @@ router.get('/:userId/requests', (req, res) => {
 					}
 					else{
 						//filter and return elements matching the query
-						const filteredStatusArray = requestResults.map(element => {
+						const filteredStatusArray = requestResults.filter(element => {
 							if(element.requestTo.toString() === userId && element.status === status){
 								return element;
 							}
@@ -335,7 +400,7 @@ router.get('/:userId/requests', (req, res) => {
 //create a new request
 router.post('/:userId/requests', (req, res) => {
 	//add all the required fields to an array
-	const requiredFields = ['requestFrom', 'requestTo'];
+	const requiredFields = ['requestFrom', 'requestTo', 'requestedBook'];
 	//loop through the array and check if all required properties are in the req body
 	for(let i=0; i<requiredFields.length; i++){
 		const field = requiredFields[i];
@@ -346,21 +411,16 @@ router.post('/:userId/requests', (req, res) => {
 		}
 	}
 	//if all properties are in the request body
-	//console.log('creating request');
 	Request.create({
 		requestFrom: req.body.requestFrom,
 		requestTo: req.body.requestTo,
 		requestedBook: req.body.requestedBook })
 		.then(newRequest => {
 			//find  the user we need to update the library using requestTo
-			// console.log('request created', newRequest);
-			// console.log('finding requestTo user account');
 			User.findById(newRequest.requestTo)
 				.then(user => {
-					//console.log('found user account', user);
 					//store the user's library to a variable
 					const userLibrary = user.library;
-					//console.log('storing library for modification', userLibrary);
 					//loop through the library to check the id of the book we need to update
 					for(let i=0; i<userLibrary.length; i++){
 						//once the match as been found
@@ -370,8 +430,8 @@ router.post('/:userId/requests', (req, res) => {
 							//update the user's library
 							User.findByIdAndUpdate(newRequest.requestTo, {$set: {library: userLibrary}})
 								.then(()=> {
-									//then make sure that the updated info is returned
-									User.findById(newRequest.requestTo)
+									//then make sure that the request info is returned
+									Request.findById(newRequest.id)
 										.then((user) => {
 											 return res.status(200).json(user);
 										})
@@ -397,6 +457,9 @@ router.post('/:userId/requests', (req, res) => {
 			res.status(500).send(internalMsg);
 		});
 });
+
+//update an existing request
+
 
 
 module.exports = router;
