@@ -80,7 +80,7 @@ router.post('/', (req, res) => {
 	.then(user => res.status(201).json(user))
 	.catch(err => {
 		console.log(err);
-		res.status(500).send(internalMsg);
+		res.status(500).json({ message: internalMsg});
 	});
 });
 
@@ -114,7 +114,7 @@ router.put('/:id', (req, res) => {
 	})
 	.catch(err => {
 		console.log(err);
-		res.status(400).send(internalMsg)
+		res.status(400).json({ message: internalMsg});
 	});
 });
 
@@ -127,7 +127,7 @@ router.delete('/:id', (req, res) => {
 	})
 	.catch(err => {
 		console.log(err);
-		res.status(400).send(internalMsg)
+		res.status(400).json({ message: internalMsg});
 	});
 });
 
@@ -153,12 +153,12 @@ router.get('/:id/books', (req, res) => {
 				res.status(200).json(filteredResult);
 			}
 			else{
-				res.status(200).json(queryUnexpected);
+				res.status(200).json({ message: queryUnexpected });
 			}
 		})
 		.catch(err => {
 			console.log(err);
-			res.status(500).send(err);
+			res.status(500).json({ message: internalMessage });
 		});
 });
 
@@ -207,17 +207,17 @@ router.post('/:id/books', (req, res) => {
 									})
 									.catch(err => {
 									console.log(err);
-									res.status(500).json({ message: internalMsg });
+									res.status(500).json({ message: internalMessage });
 								});
 							})
 							.catch(err => {
 								console.log(err);
-								res.status(500).json({ message: internalMsg });
+								res.status(500).json({ message: internalMessage });
 							});
 					})
 					.catch(err => {
 						console.log(err);
-						res.status(500).json({ message: internalMsg });
+						res.status(500).json({ message: internalMessage });
 					});
 			}
 			//else check google for the isbn
@@ -252,7 +252,7 @@ router.post('/:id/books', (req, res) => {
 								.then(() => Promise.resolve())
 								.catch(err => {
 									console.log(err);
-									res.status(500).json({ message: internalMsg });
+									res.status(500).json({ message: internalMessage });
 								});
 							res.status(200).json(searchResult);
 						}
@@ -290,12 +290,12 @@ router.delete('/:id/books/:bookEntryId', (req, res) => {
 				.then(() => res.status(200).json({ message: 'Book has been deleted.' }))
 				.catch(err => {
 					console.log(err);
-					res.status(500).json({ message: internalMsg });
+					res.status(500).json({ message: internalMessage });
 				});
 		})
 		.catch(err => {
 			console.log(err);
-			res.status(500).json({ message: internalMsg });
+			res.status(500).json({ message: internalMessage });
 		});
 });
 
@@ -336,7 +336,6 @@ router.get('/:userId/requests', (req, res) => {
 					else{
 						//check if origin value is "me"
 						if(req.query.origin === "me"){
-							console.log('origin is me');
 							//filter the requestResults array
 							//only return elements with the userId in the requestFrom key
 							const filteredStatusArray = requestResults.filter(element => {
@@ -349,7 +348,6 @@ router.get('/:userId/requests', (req, res) => {
 						}
 						//else
 						else{
-							console.log('origin is not me');
 							//filter the requestResults array
 							//only return elements with the userId in the requestTo key
 							const filteredStatusArray = requestResults.filter(element => {
@@ -364,7 +362,6 @@ router.get('/:userId/requests', (req, res) => {
 				}
 				//else if both status and origin is present
 				else{
-					console.log(userQueries);
 					const status = req.query.status;
 					const origin = req.query.origin;
 					//if origin is me
@@ -393,7 +390,7 @@ router.get('/:userId/requests', (req, res) => {
 		})
 		.catch(err => {
 			console.log(err);
-			res.status(500).send(internalMsg);
+			res.status(500).json({ message: internalMessage });
 		});
 });
 
@@ -437,29 +434,199 @@ router.post('/:userId/requests', (req, res) => {
 										})
 										.catch(err => {
 											console.log(err);
-											res.status(500).json({ message: internalMsg });
+											res.status(500).json({ message: internalMessage });
 										});
 								})
 								.catch(err => {
 									console.log(err);
-									res.status(500).send(internalMsg);
+									res.status(500).json({ message: internalMessage });
 								});
 						}
 					}
 				})
 				.catch(err => {
 					console.log(err);
-					res.status(500).send(internalMsg);
+					res.status(500).json({ message: internalMessage });
 				});
 		})
 		.catch(err => {
 			console.log(err);
-			res.status(500).send(internalMsg);
+			res.status(500).json({ message: internalMessage });
 		});
 });
 
 //update an existing request
+router.put('/:userId/requests/:reqId', (req, res) => {
+	const params = req.params;
+	//we need something to hold what the updated data should be
+	const toUpdate = {};
+	//properties that client can update
+	const canBeUpdated = ['status', 'tradedBook'];
+	//loop through the properties that can be updated
+	//check if client sent in data for those
+	for(let i=0; i<canBeUpdated.length;i++){
+		const field = canBeUpdated[i];
+		//if the property is in the req body and it is not null
+		if(field in req.body && req.body.field !== null){
+			//start adding the properties to the toUpdate object
+			toUpdate[field] = req.body[field];
+		}
+	}
+	//find the request
+	Request.findById(params.reqId)
+		.then(request => {
+			return request;
+		})
+		.then(request => {
+			//update the request
+			Request.findByIdAndUpdate(params.reqId, { $set: toUpdate })
+				.then(() => Promise.resolve())
+				.catch(err => {
+					console.log(err);
+					res.status(500).json({ message: internalMessage });
+				});
+			//if status is accepted
+			if(req.body.status === 'accepted'){
+				//remove both books from each other's library
+				//the user who accepted the request first
+				User.findById(params.userId)
+					.then(user => {
+						//assigns the library to a variable
+						const userLibrary = user.library;
+						let index;
+						//loop through the array and get  the index of the element
+						//that has the value of id equal to the bookEntryId
+						for(let i=0; i<userLibrary.length; i++){
+							if(userLibrary[i].id.toString() === request.requestedBook.toString()){
+								index = i;
+							}
+						}
+						const removedBook = userLibrary.splice(index, 1);
+						User.findByIdAndUpdate(req.params.userId, { $set: { library: userLibrary } })
+							.then(() => Promise.resolve())
+							.catch(err => {
+								console.log(err);
+								res.status(500).json({ message: internalMessage });
+							});
+						Promise.resolve();
+					})
+					.catch(err => {
+						console.log(err);
+						res.status(500).json({ message: internalMessage });
+					});
 
+				//the user who initiated the request next
+				User.findById(request.requestFrom)
+					.then(user => {
+						//assigns the library to a variable
+						const userLibrary = user.library;
+						let index;
+						//loop through the array and get  the index of the element
+						//that has the value of id equal to the bookEntryId
+						for(let i=0; i<userLibrary.length; i++){
+							if(userLibrary[i].id.toString() === request.tradedBook){
+								index = i;
+							}
+						}
+						const removedBook = userLibrary.splice(index, 1);
+						User.findByIdAndUpdate(request.requestFrom, { $set: { library: userLibrary } })
+							.then(() => Promise.resolve())
+							.catch(err => {
+								console.log(err);
+								res.status(500).json({ message: internalMessage });
+							});
+					Promise.resolve();
+					})
+					.catch(err => {
+						console.log(err);
+						res.status(500).json({ message: internalMessage });
+					});
+			}
+			//if status is declined, just update the book that was requested to hasPending false
+			else{
+				User.findById(params.userId)
+					.then(user => {
+						//store the user's library to a variable
+						const userLibrary = user.library;
+						//loop through the library to check the id of the book we need to update
+						for(let i=0; i<userLibrary.length; i++){
+							//once the match as been found
+							if(userLibrary[i].id.toString() === request.requestedBook.toString()){
+								//change the hasPendingRequest value to false
+								userLibrary[i].hasPendingRequest = false;
+								//update the user's library
+								User.findByIdAndUpdate(params.userId, {$set: {library: userLibrary}})
+									.then(()=> Promise.resolve())
+									.catch(err => {
+										console.log(err);
+										res.status(500).json({ message: internalMessage });
+									});
+							}
+						}
+						Promise.resolve();
+					})
+					.catch(err => {
+						console.log(err);
+						res.status(500).json({ message: internalMessage });
+					});
+			}
+		res.status(200).json(request);
+		})
+		.catch(err => {
+			console.log(err);
+			res.status(500).json({ message: internalMessage });
+		});
+});
+
+//cancel the request from the requester's side
+router.delete('/:userId/requests/:reqId', (req, res) => {
+	//look for the reqID
+	Request.findById(req.params.reqId)
+		.then(request => {
+			//store the request
+			const userRequest = request;
+			//update the status of the request to cancelled
+			userRequest.status = 'cancelled';
+			//update the request
+			Request.findByIdAndUpdate(req.params.reqId, { $set: userRequest})
+				.then(() => Promise.resolve())
+				.catch(err => {
+					console.log(err);
+					res.status(500).json({ message: internalMessage });
+				});
+			//update the book status to hasPending false
+			User.findById(request.requestTo)
+				.then(user => {
+					//store the user library
+					const userLibrary = user.library;
+					//loop through the library to check the id of the book we need to update
+					for(let i=0; i<userLibrary.length; i++){
+						//once the match as been found
+						if(userLibrary[i].id.toString() === request.requestedBook.toString()){
+							//change the hasPendingRequest value to false
+							userLibrary[i].hasPendingRequest = false;
+							//update the user's library
+							User.findByIdAndUpdate(request.requestTo, {$set: {library: userLibrary}})
+								.then(()=> Promise.resolve())
+								.catch(err => {
+									console.log(err);
+									res.status(500).json({ message: internalMessage });
+								});
+						}
+					}
+					Promise.resolve();
+				})
+				.catch(err => {
+					console.log(err);
+					res.status(500).json({ message: internalMessage });
+				});
+			res.status(200).json({ message: 'Request has been cancelled.' });
+		})
+		.catch(err => {
+			console.log(err);
+			res.status(500).json({ message: internalMessage });
+		});
+});
 
 
 module.exports = router;

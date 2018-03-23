@@ -25,11 +25,10 @@ const requestSchema = mongoose.Schema({
 		type: mongoose.Schema.Types.ObjectId,
 		ref: 'Book',
 		required: true
-	}/*,
+	},
 	tradedBook: {
-		type: mongoose.Schema.Types.ObjectId,
-		ref: 'Book',
-	},*/
+		type: String
+	}
 });
 
 const Request = mongoose.model('Request', requestSchema);
