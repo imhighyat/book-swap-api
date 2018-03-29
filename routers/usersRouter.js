@@ -25,7 +25,7 @@ router.get('/', (req, res) => {
 	//if query value is a string and value is either true/false,
 	//assign the db query parameter to the value of req.query
 	else if(typeof(active) === 'string' && (active === 'true' || active === 'false')){
-		userPromise = User.find({isActive: active});
+		userPromise = User.find({ isActive: active });
 	}
 	//send a warning msg if query is unexpected
 	else{
@@ -89,7 +89,7 @@ router.put('/:id', (req, res) => {
 	// ensure that the id in the request path and the one in request body match
 	if(!(req.params.id === req.body.id)){
 		const message = `The request path ID ${req.params.id} and request body ID ${req.body.id} should match.`;
-		return res.status(400).json({message});
+		return res.status(400).json({ message });
 	}
 	//we need something to hold what the updated data should be
 	const toUpdate = {};
@@ -106,7 +106,7 @@ router.put('/:id', (req, res) => {
 		}
 	}
 	//update the database
-	User.findByIdAndUpdate(req.params.id, {$set: toUpdate})
+	User.findByIdAndUpdate(req.params.id, { $set: toUpdate })
 	.then(()=>{
 		//make sure to return the update account
 		return User.findById(req.params.id)
@@ -114,20 +114,20 @@ router.put('/:id', (req, res) => {
 	})
 	.catch(err => {
 		console.log(err);
-		res.status(400).json({ message: internalMsg});
+		res.status(400).json({ message: internalMsg });
 	});
 });
 
 //disable a specific restaturant profile/account by setting isActive to false
 router.delete('/:id', (req, res) => {
-	User.findByIdAndUpdate(req.params.id, {$set: {isActive: 'false'}})
+	User.findByIdAndUpdate(req.params.id, { $set: { isActive: 'false' }})
 	.then(()=> {
 		const message = 'Account has been disabled.';
-		res.status(200).json({message});
+		res.status(200).json({ message });
 	})
 	.catch(err => {
 		console.log(err);
-		res.status(400).json({ message: internalMsg});
+		res.status(400).json({ message: internalMsg });
 	});
 });
 
@@ -168,13 +168,13 @@ router.post('/:id/books', (req, res) => {
 	//if not matching return a warning message
 	if(!(req.params.id === req.body.id)){
 		const message = `The request path ID ${req.params.id} and request body ID ${req.body.id} should match.`;
-		return res.status(400).json({message});
+		return res.status(400).json({ message });
 	}	
 	//make sure that the book field is passed on to the req.body
 	//if not return a warning message
 	if(!('book' in req.body)){
 		const message = 'Missing the book id in request body.';
-		return res.status(400).json({message});
+		return res.status(400).json({ message });
 	}
 	//check on the books collection first using the isbn from req body
 	Book.find({ isbn: req.body.book })
@@ -182,7 +182,7 @@ router.post('/:id/books', (req, res) => {
 			//if we have a result
 			if(result.length){
 				//assign the Obj id to an obj
-				const bookObj = {book: result[0].id};
+				const bookObj = { book: result[0].id };
 				//check if user already registered the book in the library
 				User.findById(req.params.id)
 					.then(user => {
@@ -193,17 +193,17 @@ router.post('/:id/books', (req, res) => {
 							//if it exists, return a warning msg
 							if(userLibrary[i].book.toString() === bookObj.book){
 								const message = 'Book already exists in the library.';
-								return res.status(200).json({message})
+								return res.status(200).json({ message })
 							}
 						}
 						//otherwise add the book obj to the user's library using push
-						User.findByIdAndUpdate(req.params.id, {$push: {library: bookObj}})
+						User.findByIdAndUpdate(req.params.id, { $push: { library: bookObj }})
 							.then(()=> {
 								//then make sure that the updated info is returned
 								User.findById(req.params.id)
 									.then((user) => {
 										//here we'll returning just the book that was created
-										res.status(200).json(user.library[user.library.length-1]);
+										res.status(200).json(user.library[user.library.length - 1]);
 									})
 									.catch(err => {
 									console.log(err);
@@ -226,7 +226,7 @@ router.post('/:id/books', (req, res) => {
 					.then(googleResult => {
 						//if found no results, send a msg that we cant find it
 						if(!googleResult.data.totalItems){
-							return res.status(404).json({message: cantFindMsg});
+							return res.status(404).json({ message: cantFindMsg });
 						}
 						//save the result to our collection first before returning it
 						else{
@@ -365,7 +365,7 @@ router.get('/:userId/requests', (req, res) => {
 					const status = req.query.status;
 					const origin = req.query.origin;
 					//if origin is me
-					if(origin === "me"){
+					if(origin === 'me'){
 						//filter and return elements matching the query
 						const filteredStatusArray = requestResults.filter(element => {
 							if(element.requestFrom.toString() === userId && element.status === status){
@@ -404,7 +404,7 @@ router.post('/:userId/requests', (req, res) => {
 		if(!(field in req.body)){
 			//if any of the field is missing
 			const message = `Missing ${field} in request body.`;
-			return res.status(400).json({message});
+			return res.status(400).json({ message });
 		}
 	}
 	//if all properties are in the request body
@@ -555,7 +555,7 @@ router.put('/:userId/requests/:reqId', (req, res) => {
 								//change the hasPendingRequest value to false
 								userLibrary[i].hasPendingRequest = false;
 								//update the user's library
-								User.findByIdAndUpdate(params.userId, {$set: {library: userLibrary}})
+								User.findByIdAndUpdate(params.userId, { $set: { library: userLibrary }})
 									.then(()=> Promise.resolve())
 									.catch(err => {
 										console.log(err);
@@ -588,7 +588,7 @@ router.delete('/:userId/requests/:reqId', (req, res) => {
 			//update the status of the request to cancelled
 			userRequest.status = 'cancelled';
 			//update the request
-			Request.findByIdAndUpdate(req.params.reqId, { $set: userRequest})
+			Request.findByIdAndUpdate(req.params.reqId, { $set: userRequest })
 				.then(() => Promise.resolve())
 				.catch(err => {
 					console.log(err);
@@ -606,7 +606,7 @@ router.delete('/:userId/requests/:reqId', (req, res) => {
 							//change the hasPendingRequest value to false
 							userLibrary[i].hasPendingRequest = false;
 							//update the user's library
-							User.findByIdAndUpdate(request.requestTo, {$set: {library: userLibrary}})
+							User.findByIdAndUpdate(request.requestTo, { $set: { library: userLibrary }})
 								.then(()=> Promise.resolve())
 								.catch(err => {
 									console.log(err);

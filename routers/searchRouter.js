@@ -24,20 +24,20 @@ router.get('/', (req, res) => {
 		return res.status(400).json({ message: emptySearchMsg });
 	}
 	else{
-		if(queryKey[0] === "isbn"){
+		if(queryKey[0] === 'isbn'){
 			searchValue = req.query.isbn;
-			category = "isbn";
+			category = 'isbn';
 			bookPromise = Book.find({ isbn: req.query.isbn });
 		}
-		else if(queryKey[0] === "author"){
+		else if(queryKey[0] === 'author'){
 			searchValue = req.query.author;
-			category = "inauthor";
+			category = 'inauthor';
 			bookPromise = Book.find({ $text: { $search: searchValue }});
 			//bookPromise = Book.find({ author: { $in: searchValue.split(" ") }});
 		}
-		else if(queryKey[0] === "title"){
+		else if(queryKey[0] === 'title'){
 			searchValue = req.query.title;
-			category = "intitle";
+			category = 'intitle';
 			//bookPromise = Book.find({ title: { $in: searchValue.split(" ") }});
 			bookPromise = Book.find({ $text: { $search: searchValue }});
 		}
@@ -51,20 +51,29 @@ router.get('/', (req, res) => {
 		//query the books collection first
 		bookPromise
 		.then(results => {
-			console.log('checking collection');
+			console.log('checking collection', results.length);
 			//if we have search results
 			if(results.length){
-				//return with the results
-				return res.status(200).json(results);
+				//since we now have the total number of results
+				//limit the results to 10 and use pagination
+				bookPromise.limit(10).skip(10 * (req.query.page - 1 || 0))
+					.then(limitedResults => {
+						//return with the limited results plus the total number of items
+						return res.status(200).json({ results: limitedResults, totalItems: results.length });
+					})
+					.catch(err => {
+						console.log(err);
+						res.status(500).json({ message: internalMsg });
+					});
 			}
 			//else, make an API call to google book using category and searchValue from client
 			else{
-				axios.get(`https://www.googleapis.com/books/v1/volumes?q=${category}:${searchValue.split(" ").join("+")}&key=${GOOGLE_API}&maxResults=40`)
+				axios.get(`https://www.googleapis.com/books/v1/volumes?q=${category}:${searchValue.split(' ').join('+')}&key=${GOOGLE_API}&maxResults=10&startIndex=${req.query.page - 1 || 0}`)
 					.then(googleResults => {
-						console.log('checking google');
+						console.log('checking google', googleResults.data.totalItems);
 						//if no results found by google API, send a msg that we cant find the book
 						if(!googleResults.data.totalItems){
-							res.status(404).json({message: cantFindMsg});
+							res.status(404).json({ message: cantFindMsg });
 						}
 						//if results found
 						else{
@@ -105,18 +114,18 @@ router.get('/', (req, res) => {
 									});
 							}
 							//return the search results to client
-							res.status(200).json(searchResults);
+							res.status(200).json({ data: searchResults, totalItems: googleResults.data.totalItems });
 						}
 					})
 					.catch(err => {
 						console.log(err);
-						res.status(500).send(internalMsg);
+						res.status(500).json({ message: internalMsg });
 					});
 			}
 		})
 		.catch(err => {
 			console.log(err);
-			res.status(500).send(internalMsg);
+			res.status(500).json({ message: internalMsg });
 		});
 	}
 });
@@ -132,31 +141,31 @@ router.get('/deepsearch', (req, res) => {
 		return res.status(400).json({ message: emptySearchMsg });
 	}
 	else{
-		if(queryKey[0] === "isbn"){
+		if(queryKey[0] === 'isbn'){
 			searchValue = req.query.isbn;
-			category = "isbn";
+			category = 'isbn';
 		}
-		else if(queryKey[0] === "author"){
+		else if(queryKey[0] === 'author'){
 			searchValue = req.query.author;
-			category = "inauthor";
+			category = 'inauthor';
 		}
-		else if(queryKey[0] === "title"){
+		else if(queryKey[0] === 'title'){
 			searchValue = req.query.title;
-			category = "intitle";
+			category = 'intitle';
 		}
 		else{
 			return res.status(400).json({ message: unexpectedQueryMsg });
 		}
 		//if no input received from client about the value of query, send a warning msg
-		if(searchValue === ""){
+		if(searchValue === ''){
 			return res.status(400).json({ message: emptySearchMsg });
 		}
 		//make an API call to google book using category and searchValue from client
-		axios.get(`https://www.googleapis.com/books/v1/volumes?q=${category}:${searchValue.split(" ").join("+")}&key=${GOOGLE_API}&maxResults=40`)
+		axios.get(`https://www.googleapis.com/books/v1/volumes?q=${category}:${searchValue.split(' ').join('+')}&key=${GOOGLE_API}&maxResults=10&startIndex=${req.query.page - 1 || 0}`)
 			.then(googleResults => {
 				//if no results found by API, send a msg that we cant find the book
 				if(!googleResults.data.totalItems){
-					res.status(404).json({message: cantFindMsg});
+					res.status(404).json({ message: cantFindMsg });
 				}
 				//if results found
 				else{
@@ -195,12 +204,12 @@ router.get('/deepsearch', (req, res) => {
 							});
 					}
 					//return the search results to client
-					res.status(200).json(searchResults);
+					res.status(200).json({ data: searchResults, totalItems: googleResults.data.totalItems });
 				}
 			})
 			.catch(err => {
 				console.log(err);
-				res.status(500).send(internalMsg);
+				res.status(500).json({ message: internalMsg });
 			});
 	}
 });
