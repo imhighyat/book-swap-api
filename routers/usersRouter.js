@@ -32,7 +32,7 @@ router.get('/', (req, res) => {
 		return res.status(400).json({ message: queryUnexpected });
 	}
 	//query db based on the value of userPromise
-	userPromise
+	userPromise.populate('library.book')
 		.then(data => {
 			res.status(200).json(data);
 		})
@@ -44,7 +44,7 @@ router.get('/', (req, res) => {
 
 //fetch user account with an id
 router.get('/:id', (req, res) => {
-	User.findById(req.params.id)
+	User.findById(req.params.id).populate('library.book')
 		.then(data => {
 			res.status(200).json(data);
 		})
@@ -109,7 +109,7 @@ router.put('/:id', (req, res) => {
 	User.findByIdAndUpdate(req.params.id, { $set: toUpdate })
 	.then(()=>{
 		//make sure to return the update account
-		return User.findById(req.params.id)
+		return User.findById(req.params.id).populate('library.book')
 			.then(data => res.status(200).json(data));
 	})
 	.catch(err => {
@@ -134,7 +134,7 @@ router.delete('/:id', (req, res) => {
 //fetch books from user's library depending on the query
 router.get('/:id/books', (req, res) => {
 	const available = req.query.available;	
-	User.findById(req.params.id)
+	User.findById(req.params.id).populate('library.book')
 		.then(user => {
 			const library = user.library;
 			//if no query was sent, return all user accounts
@@ -184,7 +184,7 @@ router.post('/:id/books', (req, res) => {
 				//assign the Obj id to an obj
 				const bookObj = { book: result[0].id };
 				//check if user already registered the book in the library
-				User.findById(req.params.id)
+				User.findById(req.params.id).populate('library.book')
 					.then(user => {
 						//assign the whole library to a variable
 						const userLibrary = user.library;
@@ -200,7 +200,7 @@ router.post('/:id/books', (req, res) => {
 						User.findByIdAndUpdate(req.params.id, { $push: { library: bookObj }})
 							.then(()=> {
 								//then make sure that the updated info is returned
-								User.findById(req.params.id)
+								User.findById(req.params.id).populate('library.book')
 									.then((user) => {
 										//here we'll returning just the book that was created
 										res.status(200).json(user.library[user.library.length - 1]);
@@ -306,7 +306,7 @@ router.get('/:userId/requests', (req, res) => {
 	//store the query object
 	const userQueries = Object.keys(req.query);
 	//first find all the requests with the userId in requestFrom or requestTo
-	Request.find({ $or: [{ requestFrom: userId }, { requestTo: userId }]})
+	Request.find({ $or: [{ requestFrom: userId }, { requestTo: userId }]}).populate('requestFrom').populate('requestTo').populate('requestedBook')
 		.then(results => {
 			//store the result to an array that we can filter later
 			const requestResults = results;
@@ -414,7 +414,7 @@ router.post('/:userId/requests', (req, res) => {
 		requestedBook: req.body.requestedBook })
 		.then(newRequest => {
 			//find  the user we need to update the library using requestTo
-			User.findById(newRequest.requestTo)
+			User.findById(newRequest.requestTo).populate('library.book')
 				.then(user => {
 					//store the user's library to a variable
 					const userLibrary = user.library;
@@ -428,7 +428,7 @@ router.post('/:userId/requests', (req, res) => {
 							User.findByIdAndUpdate(newRequest.requestTo, {$set: {library: userLibrary}})
 								.then(()=> {
 									//then make sure that the request info is returned
-									Request.findById(newRequest.id)
+									Request.findById(newRequest.id).populate('requestFrom').populate('requestTo').populate('requestedBook')
 										.then((user) => {
 											 return res.status(200).json(user);
 										})
@@ -473,13 +473,13 @@ router.put('/:userId/requests/:reqId', (req, res) => {
 		}
 	}
 	//find the request
-	Request.findById(params.reqId)
+	Request.findById(params.reqId).populate('requestFrom').populate('requestTo').populate('requestedBook')
 		.then(request => {
 			return request;
 		})
 		.then(request => {
 			//update the request
-			Request.findByIdAndUpdate(params.reqId, { $set: toUpdate })
+			Request.findByIdAndUpdate(params.reqId, { $set: toUpdate }).populate('requestFrom').populate('requestTo').populate('requestedBook')
 				.then(() => Promise.resolve())
 				.catch(err => {
 					console.log(err);
@@ -489,7 +489,7 @@ router.put('/:userId/requests/:reqId', (req, res) => {
 			if(req.body.status === 'accepted'){
 				//remove both books from each other's library
 				//the user who accepted the request first
-				User.findById(params.userId)
+				User.findById(params.userId).populate('library.book')
 					.then(user => {
 						//assigns the library to a variable
 						const userLibrary = user.library;
@@ -516,7 +516,7 @@ router.put('/:userId/requests/:reqId', (req, res) => {
 					});
 
 				//the user who initiated the request next
-				User.findById(request.requestFrom)
+				User.findById(request.requestFrom).populate('library.book')
 					.then(user => {
 						//assigns the library to a variable
 						const userLibrary = user.library;
@@ -544,7 +544,7 @@ router.put('/:userId/requests/:reqId', (req, res) => {
 			}
 			//if status is declined, just update the book that was requested to hasPending false
 			else{
-				User.findById(params.userId)
+				User.findById(params.userId).populate('library.book')
 					.then(user => {
 						//store the user's library to a variable
 						const userLibrary = user.library;
@@ -595,7 +595,7 @@ router.delete('/:userId/requests/:reqId', (req, res) => {
 					res.status(500).json({ message: internalMessage });
 				});
 			//update the book status to hasPending false
-			User.findById(request.requestTo)
+			User.findById(request.requestTo).populate('library.book')
 				.then(user => {
 					//store the user library
 					const userLibrary = user.library;

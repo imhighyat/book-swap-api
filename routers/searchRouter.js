@@ -59,7 +59,7 @@ router.get('/', (req, res) => {
 				bookPromise.limit(10).skip(10 * (req.query.page - 1 || 0))
 					.then(limitedResults => {
 						//return with the limited results plus the total number of items
-						return res.status(200).json({ results: limitedResults, totalItems: results.length });
+						return res.status(200).json({ data: limitedResults, totalItems: results.length, origin: 'collection' });
 					})
 					.catch(err => {
 						console.log(err);
@@ -114,7 +114,7 @@ router.get('/', (req, res) => {
 									});
 							}
 							//return the search results to client
-							res.status(200).json({ data: searchResults, totalItems: googleResults.data.totalItems });
+							res.status(200).json({ data: searchResults, totalItems: googleResults.data.totalItems, origin: 'google' });
 						}
 					})
 					.catch(err => {

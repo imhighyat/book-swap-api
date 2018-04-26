@@ -96,7 +96,7 @@ router.get('/:isbn/users', (req, res) => {
 			//store the obj id of the book
 			//check the user's library who has the book for offering
 			const bookId = bookResults[0].id;
-			User.find({ library: { $elemMatch: { book: bookId, hasPendingRequest: 'false' }}})
+			User.find({ library: { $elemMatch: { book: bookId, hasPendingRequest: 'false' }}}).populate('library.book')
 				.then(userResults => {
 					//if no results, send a msg
 					if(!userResults.length){
@@ -104,9 +104,9 @@ router.get('/:isbn/users', (req, res) => {
 					}
 					//loop through the result and take the id of the users
 					const usersOffering = userResults.map(element => {
-						return element.id;
+						return element;
 					});
-					res.status(200).json({ users: usersOffering });
+					res.status(200).json(usersOffering);
 				})
 				.catch(err => {
 					console.log(err);

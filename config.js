@@ -11,6 +11,7 @@ exports.TEST_DATABASE_URL = process.env.DATABASE_URL ||
                       'mongodb://localhost/test-book-swap';
 
 //only enable our client app to use the api
-exports.CLIENT_ORIGIN = "https://sharp-panini-de0004.netlify.com";
+//exports.CLIENT_ORIGIN = 'https://sharp-panini-de0004.netlify.com';
+exports.CLIENT_ORIGIN = '*';
 
 exports.GOOGLE_API = process.env.GOOGLE_API;
